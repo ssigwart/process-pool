@@ -1,6 +1,14 @@
 {
 	"name": "ssigwart/process-pool",
 	"license": "MIT",
+	"homepage": "https://github.com/ssigwart/process-pool",
+	"description": "Process pool to send tasks to a background task.",
+	"keywords": ["background", "process", "pool", "thread"],
+	"authors": [
+		{
+			"name": "Stephen Sigwart"
+		}
+	],
 	"autoload": {
 		"psr-4": { "ssigwart\\ProcessPool\\": "src/" }
 	},
