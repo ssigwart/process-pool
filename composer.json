@@ -1,0 +1,10 @@
+{
+	"name": "ssigwart/process-pool",
+	"license": "MIT",
+	"autoload": {
+		"psr-4": { "ssigwart\\ProcessPool\\": "src/" }
+	},
+	"require-dev": {
+		"phpunit/phpunit": "^9"
+	}
+}
