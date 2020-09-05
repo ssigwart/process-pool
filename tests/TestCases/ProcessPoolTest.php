@@ -5,6 +5,7 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 use ssigwart\ProcessPool\ProcessPool;
+use ssigwart\ProcessPool\ProcessPoolException;
 use ssigwart\ProcessPool\ProcessPoolPoolExhaustedException;
 use ssigwart\ProcessPool\ProcessPoolUnexpectedEOFException;
 
@@ -20,6 +21,19 @@ final class ProcessPoolTest extends TestCase
 	{
 		$this->expectException(ProcessPoolUnexpectedEOFException::class);
 		$pool = new ProcessPool(1, 1, 'sleep 0', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+		$req1 = $pool->startProcess();
+		$req1->sendRequest('');
+		$req1->getStdoutResponse();
+	}
+
+	/**
+	 * Test invalid max spares
+	 */
+	public function testInvalidMaxSpares(): void
+	{
+		$pool = new ProcessPool(5, 10, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+		$this->expectException(ProcessPoolException::class);
+		$pool->setMaxNumSpareProcesses(3);
 	}
 
 	/**
@@ -27,14 +41,27 @@ final class ProcessPoolTest extends TestCase
 	 */
 	public function testProcessPool(): void
 	{
+		$minPoolSize = 1;
 		$poolSize = 3;
-		$pool = new ProcessPool(1, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+		$pool = new ProcessPool($minPoolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+		$maxSpares = 2;
+		$pool->setMaxNumSpareProcesses($maxSpares);
 
 		// Single process
+		$numRunning = 0;
+		$numUnassigned = $minPoolSize;
 		$req1 = $pool->startProcess();
 		$req1->sendRequest('Testing 1');
+		$numRunning++;
+		$numUnassigned--;
+		if ($numUnassigned < 0)
+			$numUnassigned = 0;
+		$this->assertEquals($numRunning, $pool->getNumRunningProcesses(), 'Number of processes running incorrect.');
+		$this->assertEquals($numUnassigned, $pool->getNumUnassignedProcesses(), 'Number of processes unassigned incorrect.');
 		$this->assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req1->getStdoutResponse(), 'MD5 incorrect.');
 		$pool->releaseProcess($req1);
+		$numRunning--;
+		$numUnassigned++;
 
 		// Multiple processes
 		$msgs = [
@@ -47,6 +74,12 @@ final class ProcessPoolTest extends TestCase
 		{
 			$req = $pool->startProcess();
 			$req->sendRequest($msg);
+			$numRunning++;
+			$numUnassigned--;
+			if ($numUnassigned < 0)
+				$numUnassigned = 0;
+			$this->assertEquals($numRunning, $pool->getNumRunningProcesses(), 'Number of processes running incorrect.');
+			$this->assertEquals($numUnassigned, $pool->getNumUnassignedProcesses(), 'Number of processes unassigned incorrect.');
 			$requests[] = $req;
 		}
 		reset($requests);
@@ -55,6 +88,10 @@ final class ProcessPoolTest extends TestCase
 		{
 			$this->assertEquals($md5, $req->getStdoutResponse(), 'MD5 incorrect.');
 			$pool->releaseProcess($req);
+			$numRunning--;
+			$numUnassigned++;
+			$this->assertEquals($numRunning, $pool->getNumRunningProcesses(), 'Number of processes running incorrect.');
+			$this->assertEquals(min($maxSpares, $numUnassigned), $pool->getNumUnassignedProcesses(), 'Number of processes unassigned incorrect.');
 			$req = next($requests);
 		}
 

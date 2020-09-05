@@ -11,6 +11,9 @@ class ProcessPool
 	/** Max number of processes */
 	private $maxNumProcs = 0;
 
+	/** Max number of unassigned processes */
+	private $maxNumUnassignedProcs = 0;
+
 	/** @var ProcessPoolRequest[] Running process pool */
 	private $runningProcs = [];
 
@@ -39,6 +42,7 @@ class ProcessPool
 	{
 		$this->minNumProcs = $minNumProcs;
 		$this->maxNumProcs = $maxNumProcs;
+		$this->maxNumUnassignedProcs = min($this->minNumProcs + 5, $this->maxNumProcs);
 		$this->cmd = $cmd;
 		$this->cwd = $cwd;
 		$this->env = $env;
@@ -49,9 +53,62 @@ class ProcessPool
 	}
 
 	/**
+	 * Destructor
+	 */
+	public function __destruct()
+	{
+		// Close processes
+		foreach ($this->runningProcs as $proc)
+		{
+			try {
+				$proc->close();
+			} catch (Throwable $e) {}
+		}
+		foreach ($this->unassignedProcs as $proc)
+		{
+			try {
+				$proc->close();
+			} catch (Throwable $e) {}
+		}
+	}
+
+	/**
+	 * Set max number of space processes
+	 *
+	 * @param int $maxNumUnassignedProcs Max number of spare processes. Must be at least min number of processes
+	 *
+	 * @throws ProcessPoolException
+	 */
+	public function setMaxNumSpareProcesses(int $maxNumUnassignedProcs): void
+	{
+		if ($maxNumUnassignedProcs < $this->minNumProcs)
+			throw new ProcessPoolException('Number of spare servers cannot be less than minimum number of processes (' . $this->minNumProcs . ').');
+	}
+
+	/**
+	 * Get number of processes running
+	 *
+	 * @return int Number of processes
+	 */
+	public function getNumRunningProcesses(): int
+	{
+		return count($this->runningProcs);
+	}
+
+	/**
+	 * Get number of processes started, but not service a request
+	 *
+	 * @return int Number of processes
+	 */
+	public function getNumUnassignedProcesses(): int
+	{
+		return count($this->unassignedProcs);
+	}
+
+	/**
 	 * Add a process
 	 */
-	private function addProcess()
+	private function addProcess(): void
 	{
 		$this->unassignedProcs[] = new ProcessPoolRequest($this->cmd, $this->cwd, $this->env);
 	}
@@ -86,7 +143,7 @@ class ProcessPool
 	 * @param ProcessPoolRequest $process Process
 	 * @throws ProcessPoolException
 	 */
-	public function releaseProcess(ProcessPoolRequest $process)
+	public function releaseProcess(ProcessPoolRequest $process): void
 	{
 		// Find process
 		$procIdx = null;
@@ -106,8 +163,8 @@ class ProcessPool
 		// Start a new process on failure
 		if ($process->hasFailed())
 			$this->addProcess();
-		// Add this process back to the pull
-		else
+		// Add this process back to the pool if needed
+		else if ($this->getNumUnassignedProcesses() + 1 < $this->maxNumUnassignedProcs)
 			$this->unassignedProcs[] = $process;
 	}
 }

@@ -48,7 +48,7 @@ class ProcessPoolRequest
 	 * @param string $data Data to send
 	 * @throws ProcessPoolException
 	 */
-	public function sendRequest(string $data)
+	public function sendRequest(string $data): void
 	{
 		if ($this->process === null)
 			throw new ProcessPoolResourceFailedException();
@@ -63,19 +63,22 @@ class ProcessPoolRequest
 	 *
 	 * @throws ProcessPoolException
 	 */
-	public function freeRequest()
+	public function freeRequest(): void
 	{
 		// Make sure we read all data
-		if ($this->stdoutBuffer === null)
-			$this->getStdoutResponse();
-		if ($this->hasStderrData())
-			$this->getStderrResponse();
+		if ($this->process !== null)
+		{
+			if ($this->stdoutBuffer === null)
+				$this->getStdoutResponse();
+			if ($this->hasStderrData())
+				$this->getStderrResponse();
+		}
 	}
 
 	/**
 	 * Close process
 	 */
-	private function close()
+	public function close(): void
 	{
 		if ($this->process !== null)
 		{
