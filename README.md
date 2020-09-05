@@ -6,7 +6,8 @@ $minPoolSize = 1;
 $maxPoolSize = 10;
 poolProcessCmd = 'php process.php';
 $cwd = '/path/to/pool/process';
-$pool = new ProcessPool($minPoolSize, $maxPoolSize, $poolProcessCmd, );
+$pool = new ProcessPool($minPoolSize, $maxPoolSize, $poolProcessCmd, $cwd);
+$pool->setMaxNumSpareProcesses(3);
 ```
 
 ## Implementing a Pool Process
