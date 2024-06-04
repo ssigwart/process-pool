@@ -23,7 +23,9 @@ final class ProcessPoolTest extends TestCase
 		$pool = new ProcessPool(1, 1, 'sleep 0', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
 		$req1 = $pool->startProcess();
 		$req1->sendRequest('');
-		$req1->getStdoutResponse();
+		self::assertEquals('', $req1->getStdoutResponse());
+		self::assertEquals('', $req1->getStderrResponse());
+		$pool->releaseProcess($req1);
 	}
 
 	/**
@@ -56,9 +58,10 @@ final class ProcessPoolTest extends TestCase
 		$numUnassigned--;
 		if ($numUnassigned < 0)
 			$numUnassigned = 0;
-		$this->assertEquals($numRunning, $pool->getNumRunningProcesses(), 'Number of processes running incorrect.');
-		$this->assertEquals($numUnassigned, $pool->getNumUnassignedProcesses(), 'Number of processes unassigned incorrect.');
-		$this->assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals($numRunning, $pool->getNumRunningProcesses(), 'Number of processes running incorrect.');
+		self::assertEquals($numUnassigned, $pool->getNumUnassignedProcesses(), 'Number of processes unassigned incorrect.');
+		self::assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('', $req1->getStderrResponse(), 'Stderr should be empty.');
 		$pool->releaseProcess($req1);
 		$numRunning--;
 		$numUnassigned++;
@@ -78,20 +81,21 @@ final class ProcessPoolTest extends TestCase
 			$numUnassigned--;
 			if ($numUnassigned < 0)
 				$numUnassigned = 0;
-			$this->assertEquals($numRunning, $pool->getNumRunningProcesses(), 'Number of processes running incorrect.');
-			$this->assertEquals($numUnassigned, $pool->getNumUnassignedProcesses(), 'Number of processes unassigned incorrect.');
+			self::assertEquals($numRunning, $pool->getNumRunningProcesses(), 'Number of processes running incorrect.');
+			self::assertEquals($numUnassigned, $pool->getNumUnassignedProcesses(), 'Number of processes unassigned incorrect.');
 			$requests[] = $req;
 		}
 		reset($requests);
 		$req = reset($requests);
 		foreach ($msgs as $md5=>$msg)
 		{
-			$this->assertEquals($md5, $req->getStdoutResponse(), 'MD5 incorrect.');
+			self::assertEquals($md5, $req->getStdoutResponse(), 'MD5 incorrect.');
+			self::assertEquals('', $req1->getStderrResponse(), 'Stderr should be empty.');
 			$pool->releaseProcess($req);
 			$numRunning--;
 			$numUnassigned++;
-			$this->assertEquals($numRunning, $pool->getNumRunningProcesses(), 'Number of processes running incorrect.');
-			$this->assertEquals(min($maxSpares, $numUnassigned), $pool->getNumUnassignedProcesses(), 'Number of processes unassigned incorrect.');
+			self::assertEquals($numRunning, $pool->getNumRunningProcesses(), 'Number of processes running incorrect.');
+			self::assertEquals(min($maxSpares, $numUnassigned), $pool->getNumUnassignedProcesses(), 'Number of processes unassigned incorrect.');
 			$req = next($requests);
 		}
 
@@ -108,14 +112,15 @@ final class ProcessPoolTest extends TestCase
 				$req->sendRequest($msg);
 				$requests[] = $req;
 			} catch (ProcessPoolPoolExhaustedException $e) {
-				$this->assertEquals($poolSize, count($requests));
+				self::assertEquals($poolSize, count($requests));
 			}
 		}
-		$this->assertEquals($poolSize, count($requests));
+		self::assertEquals($poolSize, count($requests));
 		reset($requests);
 		foreach ($requests as $req)
 		{
 			$this->assertMatchesRegularExpression('/^[0-9a-f]{32}$/AD', $req->getStdoutResponse(), 'Response is not an MD5.');
+			self::assertEquals('', $req1->getStderrResponse(), 'Stderr should be empty.');
 			$pool->releaseProcess($req);
 		}
 	}
@@ -133,14 +138,16 @@ final class ProcessPoolTest extends TestCase
 		$req1->sendRequest('Error 1');
 		$req2 = $pool->startProcess();
 		$req2->sendRequest('Testing 1');
-		$this->assertEquals('3d719f5f6edb9ce45a82b527f0ea8a64', $req1->getStdoutResponse(), 'MD5 incorrect.');
-		$this->assertEquals('Error-3d719f5f6edb9ce45a82b527f0ea8a64', trim($req1->getStderrResponse()), 'MD5 incorrect.');
+		self::assertEquals('3d719f5f6edb9ce45a82b527f0ea8a64', $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('Error-3d719f5f6edb9ce45a82b527f0ea8a64', trim($req1->getStderrResponse()), 'Stderr incorrect.');
 		$pool->releaseProcess($req1);
-		$this->assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req2->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req2->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('', $req2->getStderrResponse(), 'Stderr should be empty.');
 		// Make sure pool 1 can still process a valid response
 		$req1 = $pool->startProcess();
 		$req1->sendRequest('Testing 1');
-		$this->assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('', trim($req1->getStderrResponse()), 'Stderr incorrect.');
 		$pool->releaseProcess($req1);
 		$pool->releaseProcess($req2);
 	}
@@ -158,7 +165,8 @@ final class ProcessPoolTest extends TestCase
 		$pool->releaseProcess($req1);
 		$req1 = $pool->startProcess();
 		$req1->sendRequest('Testing 1');
-		$this->assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('', $req1->getStderrResponse(), 'Stderr should be empty.');
 		$pool->releaseProcess($req1);
 	}
 }

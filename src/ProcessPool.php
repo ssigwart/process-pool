@@ -2,6 +2,8 @@
 
 namespace ssigwart\ProcessPool;
 
+use Throwable;
+
 /** Process pool */
 class ProcessPool
 {
@@ -61,12 +63,14 @@ class ProcessPool
 		foreach ($this->runningProcs as $proc)
 		{
 			try {
+				$proc->sendExitRequest();
 				$proc->close();
 			} catch (Throwable $e) {}
 		}
 		foreach ($this->unassignedProcs as $proc)
 		{
 			try {
+				$proc->sendExitRequest();
 				$proc->close();
 			} catch (Throwable $e) {}
 		}
@@ -165,6 +169,22 @@ class ProcessPool
 			$this->addProcess();
 		// Add this process back to the pool if needed
 		else if ($this->getNumUnassignedProcesses() + 1 < $this->maxNumUnassignedProcs)
+		{
+			if ($process->hasStdoutData())
+				$process->getStdoutResponse();
+			if ($process->hasStderrData())
+				$process->getStderrResponse();
 			$this->unassignedProcs[] = $process;
+		}
+		// Otherwise, tell it to exit
+		else
+		{
+			try {
+				$process->sendExitRequest();
+				$process->close();
+			} catch (Throwable $e) {
+				// Suppress error
+			}
+		}
 	}
 }

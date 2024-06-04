@@ -28,7 +28,7 @@ class ProcessPoolProcess
 	 */
 	public function handleMessages()
 	{
-		while(true)
+		while (true)
 		{
 			$this->waitForRequest();
 			$this->finalizeRequest();

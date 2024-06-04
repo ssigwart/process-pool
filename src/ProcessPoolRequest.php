@@ -59,6 +59,21 @@ class ProcessPoolRequest
 	}
 
 	/**
+	 * Send exit request
+	 *
+	 * @throws ProcessPoolException
+	 */
+	public function sendExitRequest(): void
+	{
+		if ($this->process === null)
+			throw new ProcessPoolResourceFailedException();
+
+		// Write data
+		fwrite($this->pipes[0], ProcessPoolMessageTypes::MSG_EXIT . ';');
+		fflush($this->pipes[0]);
+	}
+
+	/**
 	 * Free request
 	 *
 	 * @throws ProcessPoolException
@@ -141,8 +156,6 @@ class ProcessPoolRequest
 
 	/** Stdout buffer */
 	private $stdoutBuffer = null;
-	/** Stderr buffer */
-	private $stderrBuffer = '';
 
 	/**
 	 * Get stdout response
@@ -193,12 +206,13 @@ class ProcessPoolRequest
 	 */
 	public function getStderrResponse(): string
 	{
+		$rtn = '';
 		while ($this->hasStderrData())
 		{
 			$lastData = $this->_getResponseFromPipe(2);
-			$this->stderrBuffer .= $lastData;
+			$rtn .= $lastData;
 		}
-		return $this->stderrBuffer;
+		return $rtn;
 	}
 
 	/**
