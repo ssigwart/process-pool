@@ -63,16 +63,26 @@ class ProcessPool
 		foreach ($this->runningProcs as $proc)
 		{
 			try {
-				$proc->sendExitRequest();
+				if (!$proc->hasFailed())
+					$proc->sendExitRequest();
+			} catch (Throwable $e) {
+			}
+			try {
 				$proc->close();
-			} catch (Throwable $e) {}
+			} catch (Throwable $e) {
+			}
 		}
 		foreach ($this->unassignedProcs as $proc)
 		{
 			try {
-				$proc->sendExitRequest();
+				if (!$proc->hasFailed())
+					$proc->sendExitRequest();
+			} catch (Throwable $e) {
+			}
+			try {
 				$proc->close();
-			} catch (Throwable $e) {}
+			} catch (Throwable $e) {
+			}
 		}
 	}
 
@@ -181,6 +191,10 @@ class ProcessPool
 		{
 			try {
 				$process->sendExitRequest();
+			} catch (Throwable $e) {
+				// Suppress error
+			}
+			try {
 				$process->close();
 			} catch (Throwable $e) {
 				// Suppress error

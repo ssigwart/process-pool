@@ -30,7 +30,16 @@ class PhpUnitTestProcess implements ProcessPoolProcessMessageHandlerInterface
 		if (preg_match('/^Error/A', $data, $match))
 			error_log('Error-' . md5($data));
 
-		// Return MD5 of data
-		print md5($data);
+		// Check if we should echo data
+		if (preg_match('/^echo/A', $data, $match))
+			print $data;
+		// Check if we should echo data to stderr
+		else if (preg_match('/^stderr echo/A', $data, $match))
+			fwrite(STDERR, $data);
+		else
+		{
+			// Output MD5 of data
+			print md5($data);
+		}
 	}
 }

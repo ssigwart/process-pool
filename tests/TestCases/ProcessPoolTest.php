@@ -169,4 +169,52 @@ final class ProcessPoolTest extends TestCase
 		self::assertEquals('', $req1->getStderrResponse(), 'Stderr should be empty.');
 		$pool->releaseProcess($req1);
 	}
+
+	/**
+	 * Test pool release with long message
+	 */
+	public function testProcessPoolWithLongMessage(): void
+	{
+		$poolSize = 1;
+		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+
+		$req1 = $pool->startProcess();
+		$data = str_repeat('0123456789', 120);
+		$req1->sendRequest($data);
+		self::assertEquals(md5($data), $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('', $req1->getStderrResponse(), 'Stderr should be empty.');
+		$pool->releaseProcess($req1);
+	}
+
+	/**
+	 * Test pool release with long response
+	 */
+	public function testProcessPoolWithLongResponse(): void
+	{
+		$poolSize = 1;
+		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+
+		$req1 = $pool->startProcess();
+		$data = 'echo ' . str_repeat('0123456789', 120);
+		$req1->sendRequest($data);
+		self::assertEquals($data, $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('', $req1->getStderrResponse(), 'Stderr should be empty.');
+		$pool->releaseProcess($req1);
+	}
+
+	/**
+	 * Test pool release with long STDERR response
+	 */
+	public function testProcessPoolWithLongStderrResponse(): void
+	{
+		$poolSize = 1;
+		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+
+		$req1 = $pool->startProcess();
+		$data = 'stderr echo ' . str_repeat('0123456789', 120);
+		$req1->sendRequest($data);
+		self::assertEquals('', $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals($data, $req1->getStderrResponse(), 'Stderr should be empty.');
+		$pool->releaseProcess($req1);
+	}
 }

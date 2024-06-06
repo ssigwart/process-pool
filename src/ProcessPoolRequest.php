@@ -30,7 +30,12 @@ class ProcessPoolRequest
 		];
 		$proc = proc_open($cmd, $descriptorSpec, $this->pipes, $cwd, $env);
 		if ($proc !== false)
+		{
 			$this->process = $proc;
+
+			// Make sure `fread` doesn't block for stderr reads
+			stream_set_blocking($this->pipes[2], false);
+		}
 	}
 
 	/**
@@ -40,6 +45,32 @@ class ProcessPoolRequest
 	{
 		$this->freeRequest();
 		$this->close();
+	}
+
+	/**
+	 * Write message
+	 *
+	 * @param string $msg Message
+	 */
+	private function writeMsg(string $msg): void
+	{
+		// Write data
+		$bytesWritten = fwrite($this->pipes[0], $msg);
+		if ($bytesWritten === false || $bytesWritten === 0)
+		{
+			$exceptionMsg = 'Failed to write message.';
+			$error = error_get_last();
+			if ($error !== null)
+				$exceptionMsg .= ' ' . $error['message'];
+			throw new ProcessPoolException($exceptionMsg, $error['type'] ?? 0);
+		}
+
+		// Write more data
+		if ($bytesWritten < strlen($msg))
+			$this->writeMsg(substr($msg, $bytesWritten));
+		// Flush when done
+		else
+			fflush($this->pipes[0]);
 	}
 
 	/**
@@ -54,8 +85,7 @@ class ProcessPoolRequest
 			throw new ProcessPoolResourceFailedException();
 
 		// Write data
-		fwrite($this->pipes[0], ProcessPoolMessageTypes::MSG_START_REQUEST . ';' . strlen($data) . PHP_EOL . $data);
-		fflush($this->pipes[0]);
+		$this->writeMsg(ProcessPoolMessageTypes::MSG_START_REQUEST . ';' . strlen($data) . PHP_EOL . $data);
 	}
 
 	/**
@@ -69,8 +99,7 @@ class ProcessPoolRequest
 			throw new ProcessPoolResourceFailedException();
 
 		// Write data
-		fwrite($this->pipes[0], ProcessPoolMessageTypes::MSG_EXIT . ';');
-		fflush($this->pipes[0]);
+		$this->writeMsg(ProcessPoolMessageTypes::MSG_EXIT . ';' . PHP_EOL);
 	}
 
 	/**
@@ -184,10 +213,12 @@ class ProcessPoolRequest
 		$this->stdoutBuffer = substr($this->stdoutBuffer, strlen($match[1]) + 1);
 
 		// Get response
-		while (strlen($this->stdoutBuffer) < $length)
+		$numBytesMoreToRead = $length - strlen($this->stdoutBuffer);
+		while ($numBytesMoreToRead > 0)
 		{
-			$newInput = $this->_getResponseFromPipe(1);
+			$newInput = $this->_getResponseFromPipe(1, $numBytesMoreToRead);
 			$this->stdoutBuffer .= $newInput;
+			$numBytesMoreToRead = $length - strlen($this->stdoutBuffer);
 
 			// Make sure not at EOF
 			if ($newInput === '')
@@ -219,17 +250,18 @@ class ProcessPoolRequest
 	 * Get response from pipe
 	 *
 	 * @param int $pipeIdx Pipe index
+	 * @param int|null $maxNumBytes Max number of bytes
 	 *
 	 * @return string Response
 	 * @throws ProcessPoolException
 	 */
-	private function _getResponseFromPipe(int $pipeIdx): string
+	private function _getResponseFromPipe(int $pipeIdx, ?int $maxNumBytes = null): string
 	{
 		if ($this->process === null)
 			throw new ProcessPoolResourceFailedException();
 
 		// Read some data
-		$input = fread($this->pipes[$pipeIdx], 1024);
+		$input = fread($this->pipes[$pipeIdx], min($maxNumBytes ?? 1024, 1024));
 		if ($input === false)
 		{
 			// Don't let the process be reuse

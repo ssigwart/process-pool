@@ -51,12 +51,14 @@ class ProcessPoolProcess
 		if ($msgType === ProcessPoolMessageTypes::MSG_START_REQUEST)
 		{
 			$length = $this->_waitForNumberWithEndChar(PHP_EOL);
-			while (strlen($this->inputBuffer) < $length)
+			$numBytesMoreToRead = $length - strlen($this->inputBuffer);
+			while ($numBytesMoreToRead > 0)
 			{
-				$input = fread(STDIN, 1024);
+				$input = fread(STDIN, min($numBytesMoreToRead, 1024));
 				if ($input === false)
 					throw new ProcessPoolUnexpectedEOFException();
 				$this->inputBuffer .= $input;
+				$numBytesMoreToRead = $length - strlen($this->inputBuffer);
 			}
 			$data = substr($this->inputBuffer, 0, $length);
 			$this->inputBuffer = substr($this->inputBuffer, $length);
@@ -73,7 +75,7 @@ class ProcessPoolProcess
 	}
 
 	/**
-	 * Wait for a number followed by an exd character
+	 * Wait for a number followed by a delimiter character
 	 *
 	 * @return int Number
 	 * @throws ProcessPoolException
@@ -99,7 +101,7 @@ class ProcessPoolProcess
 					throw new ProcessPoolUnexpectedMessageException();
 			}
 
-			// Get more input
+			// Get more input. Note that we expect a new ling after message types, so we can expect fread to exit before 1024 characters.
 			$input = fread(STDIN, 1024);
 			if ($input === false || ($input === '' && feof(STDIN)))
 				throw new ProcessPoolUnexpectedEOFException();
