@@ -13,6 +13,9 @@ class ProcessPoolProcess
 	/** @var string Input buffer */
 	private $inputBuffer = '';
 
+	/** @var bool Is output buffer open? */
+	private bool $isBufferOpen = false;
+
 	/**
 	 * Constructor
 	 *
@@ -21,6 +24,16 @@ class ProcessPoolProcess
 	public function __construct(ProcessPoolProcessMessageHandlerInterface $handler)
 	{
 		$this->handler = $handler;
+	}
+
+	/**
+	 * Destructor
+	 */
+	public function __destruct()
+	{
+		// Output buffer if needed. This can happen if the handle exited in `handleRequest`
+		if ($this->isBufferOpen)
+			$this->finalizeRequest();
 	}
 
 	/**
@@ -43,9 +56,14 @@ class ProcessPoolProcess
 	private function waitForRequest()
 	{
 		ob_start();
+		$this->isBufferOpen = true;
 
 		// Get message type
-		$msgType = $this->_waitForNumberWithEndChar(';');
+		try {
+			$msgType = $this->_waitForNumberWithEndChar(';');
+		} catch (ProcessPoolUnexpectedEOFException $e) {
+			throw new ProcessPoolUnexpectedEOFExceptionWhileWaitingForRequest('EOF while waiting for request.', 0, $e);
+		}
 
 		// Process message type
 		if ($msgType === ProcessPoolMessageTypes::MSG_START_REQUEST)
@@ -72,6 +90,8 @@ class ProcessPoolProcess
 		}
 		else if ($msgType === ProcessPoolMessageTypes::MSG_EXIT)
 			$this->handler->handleExit();
+		else
+			throw new ProcessPoolUnexpectedMessageException('Invalid message type "' . $msgType . '".');
 	}
 
 	/**
@@ -93,15 +113,15 @@ class ProcessPoolProcess
 					$msgTypePart = substr($this->inputBuffer, 0, $pos);
 					$this->inputBuffer = substr($this->inputBuffer, $pos + 1);
 					if (!preg_match('/^[0-9]+$/AD', $msgTypePart))
-						throw new ProcessPoolUnexpectedMessageException();
+						throw new ProcessPoolUnexpectedMessageException('Input buffer: ' . $msgTypePart);
 					return (int)$msgTypePart;
 				}
 				// Message should start with a number
 				else if (!preg_match('/^[0-9]*$/AD', $this->inputBuffer))
-					throw new ProcessPoolUnexpectedMessageException();
+					throw new ProcessPoolUnexpectedMessageException('Input buffer: ' . substr($this->inputBuffer, 0, 64));
 			}
 
-			// Get more input. Note that we expect a new ling after message types, so we can expect fread to exit before 1024 characters.
+			// Get more input. Note that we expect a new line after message types, so we can expect fread to exit before 1024 characters.
 			$input = fread(STDIN, 1024);
 			if ($input === false || ($input === '' && feof(STDIN)))
 				throw new ProcessPoolUnexpectedEOFException();
@@ -117,6 +137,7 @@ class ProcessPoolProcess
 	private function finalizeRequest()
 	{
 		$resp = ob_get_clean();
+		$this->isBufferOpen = false;
 		print strlen($resp) . ';' . $resp;
 		flush();
 	}

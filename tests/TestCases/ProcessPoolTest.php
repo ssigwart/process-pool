@@ -7,27 +7,13 @@ use PHPUnit\Framework\TestCase;
 use ssigwart\ProcessPool\ProcessPool;
 use ssigwart\ProcessPool\ProcessPoolException;
 use ssigwart\ProcessPool\ProcessPoolPoolExhaustedException;
-use ssigwart\ProcessPool\ProcessPoolUnexpectedEOFException;
+use ssigwart\ProcessPool\ProcessPoolUnexpectedMessageException;
 
 /**
  * Process pool test
  */
 final class ProcessPoolTest extends TestCase
 {
-	/**
-	 * Test invalid response
-	 */
-	public function testInvalidResponse(): void
-	{
-		$this->expectException(ProcessPoolUnexpectedEOFException::class);
-		$pool = new ProcessPool(1, 1, 'sleep 0', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
-		$req1 = $pool->startProcess();
-		$req1->sendRequest('');
-		self::assertEquals('', $req1->getStdoutResponse());
-		self::assertEquals('', $req1->getStderrResponse());
-		$pool->releaseProcess($req1);
-	}
-
 	/**
 	 * Test invalid max spares
 	 */
@@ -215,6 +201,51 @@ final class ProcessPoolTest extends TestCase
 		$req1->sendRequest($data);
 		self::assertEquals('', $req1->getStdoutResponse(), 'MD5 incorrect.');
 		self::assertEquals($data, $req1->getStderrResponse(), 'Stderr should be empty.');
+		$pool->releaseProcess($req1);
+	}
+
+	/**
+	 * Test pool process exit
+	 */
+	public function testProcessPoolExit(): void
+	{
+		$poolSize = 1;
+		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+
+		$req1 = $pool->startProcess();
+		$data = 'exit';
+		$req1->sendRequest($data);
+		self::assertEquals('exiting', $req1->getStdoutResponse());
+		$pool->releaseProcess($req1);
+	}
+
+	/**
+	 * Test pool process silent exit
+	 */
+	public function testProcessPoolSilentExit(): void
+	{
+		$poolSize = 1;
+		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+
+		$req1 = $pool->startProcess();
+		$data = 'exit-silent';
+		$req1->sendRequest($data);
+		self::assertEquals('', $req1->getStdoutResponse(), 'Stdout expected to be empty string.');
+		$pool->releaseProcess($req1);
+	}
+
+	/**
+	 * Test pool process exit hang
+	 */
+	public function testProcessPoolExitHang(): void
+	{
+		$poolSize = 1;
+		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+
+		$req1 = $pool->startProcess();
+		$data = 'exit-text-100;abc' . PHP_EOL; // This will exit with "100;abc\n", which should not be interpreted as data of length 100
+		$req1->sendRequest($data);
+		self::assertEquals('100;abc', $req1->getStdoutResponse());
 		$pool->releaseProcess($req1);
 	}
 }

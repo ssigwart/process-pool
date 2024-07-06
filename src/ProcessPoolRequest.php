@@ -2,6 +2,8 @@
 
 namespace ssigwart\ProcessPool;
 
+use Throwable;
+
 /** Process pool request */
 class ProcessPoolRequest
 {
@@ -43,8 +45,12 @@ class ProcessPoolRequest
 	 */
 	public function __destruct()
 	{
-		$this->freeRequest();
-		$this->close();
+		try {
+			$this->freeRequest();
+			$this->close();
+		} catch (Throwable $e) {
+			// Ignore cleanup error
+		}
 	}
 
 	/**
@@ -112,10 +118,18 @@ class ProcessPoolRequest
 		// Make sure we read all data
 		if ($this->process !== null)
 		{
-			if ($this->stdoutBuffer === null)
-				$this->getStdoutResponse();
-			if ($this->hasStderrData())
-				$this->getStderrResponse();
+			if (!proc_get_status($this->process)['running'])
+				$this->failed = true;
+			else
+			{
+				if ($this->stdoutBuffer === null)
+				{
+					if ($this->hasStdoutData())
+						$this->getStdoutResponse();
+				}
+				if ($this->hasStderrData())
+					$this->getStderrResponse();
+			}
 		}
 	}
 
@@ -144,7 +158,7 @@ class ProcessPoolRequest
 	/**
 	 * Check if there's stdout data
 	 *
-	 * @return bool True if there's data
+	 * @return bool True if there's data. Note that the data might be an empty string if EOF is coming next.
 	 * @throws ProcessPoolException
 	 */
 	public function hasStdoutData(): bool
@@ -155,7 +169,7 @@ class ProcessPoolRequest
 	/**
 	 * Check if there's stderr data
 	 *
-	 * @return bool True if there's data
+	 * @return bool True if there's data. Note that the data might be an empty string if EOF is coming next.
 	 * @throws ProcessPoolException
 	 */
 	public function hasStderrData(): bool
@@ -170,21 +184,40 @@ class ProcessPoolRequest
 	 * @param int $waitSec Number of seconds to wait
 	 * @param int $waitUsec Number of microseconds to wait in addition to seconds
 	 *
-	 * @return bool True if there's data
+	 * @return bool True if there's data. Note that the data might be an empty string if EOF is coming next.
 	 * @throws ProcessPoolException
 	 */
-	private function _hasPipeData(int $pipeIdx, int $waitSec = 0, int $waitUsec = 0): string
+	private function _hasPipeData(int $pipeIdx, int $waitSec = 0, int $waitUsec = 0): bool
 	{
 		if ($this->process === null)
 			throw new ProcessPoolResourceFailedException();
+
+		// Check pipes
 		$read = [$this->pipes[$pipeIdx]];
+		$write = [];
+		$except = [];
+		return stream_select($read, $write, $except, $waitSec, $waitUsec) > 0 && !feof($this->pipes[$pipeIdx]);
+	}
+
+	/**
+	 * Wait for stdout or stderr
+	 *
+	 * @param int $waitSec Wait sec
+	 * @param int $waitUsec Wait usec
+	 *
+	 * @return bool True if there's data
+	 */
+	public function waitForStdoutOrStderr(int $waitSec, int $waitUsec = 0): bool
+	{
+		// Check pipes
+		$read = [$this->pipes[1], $this->pipes[2]];
 		$write = [];
 		$except = [];
 		return stream_select($read, $write, $except, $waitSec, $waitUsec) > 0;
 	}
 
 	/** Stdout buffer */
-	private $stdoutBuffer = null;
+	private $stdoutBuffer = '';
 
 	/**
 	 * Get stdout response
@@ -194,19 +227,23 @@ class ProcessPoolRequest
 	 */
 	public function getStdoutResponse(): string
 	{
-		$this->stdoutBuffer = '';
 		$readLen = 0;
 		// Get message length
 		while (!preg_match('/^([0-9]+);/', $this->stdoutBuffer, $match))
 		{
 			if (preg_match('/[^0-9;]/', $this->stdoutBuffer) || substr($this->stdoutBuffer, 0, 1) === ';')
-				throw new ProcessPoolUnexpectedMessageException();
+				throw new ProcessPoolUnexpectedMessageException('Input buffer: ' . substr($this->stdoutBuffer, 0, 64));
 			$this->stdoutBuffer .= $this->_getResponseFromPipe(1);
 			$newReadLen = strlen($this->stdoutBuffer);
 			if ($newReadLen === 0)
+			{
+				// If this is the end of the file and there was no content, return empty string
+				if ($this->stdoutBuffer === '' && feof($this->pipes[1]))
+					return '';
 				throw new ProcessPoolUnexpectedEOFException();
+			}
 			else if ($readLen === $newReadLen)
-				throw new ProcessPoolUnexpectedMessageException();
+				throw new ProcessPoolUnexpectedMessageException('Input buffer: ' . substr($this->stdoutBuffer, 0, 64));
 			$readLen = $newReadLen;
 		}
 		$length = (int)$match[1];
@@ -257,7 +294,7 @@ class ProcessPoolRequest
 	 */
 	private function _getResponseFromPipe(int $pipeIdx, ?int $maxNumBytes = null): string
 	{
-		if ($this->process === null)
+		if ($this->process === null || $this->failed)
 			throw new ProcessPoolResourceFailedException();
 
 		// Read some data
