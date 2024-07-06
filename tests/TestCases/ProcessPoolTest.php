@@ -7,7 +7,6 @@ use PHPUnit\Framework\TestCase;
 use ssigwart\ProcessPool\ProcessPool;
 use ssigwart\ProcessPool\ProcessPoolException;
 use ssigwart\ProcessPool\ProcessPoolPoolExhaustedException;
-use ssigwart\ProcessPool\ProcessPoolUnexpectedMessageException;
 
 /**
  * Process pool test
