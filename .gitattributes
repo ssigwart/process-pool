@@ -2,5 +2,6 @@
 .gitignore export-ignore
 composer.lock export-ignore
 README.md export-ignore
+.vscode/ export-ignore
 tests/ export-ignore
 vendor/ export-ignore
