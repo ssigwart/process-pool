@@ -142,7 +142,7 @@ class ProcessPool
 				$this->addProcess();
 			// Full
 			else
-				throw new ProcessPoolPoolExhaustedException();
+				throw new ProcessPoolPoolExhaustedException('Max number of processes (' . $this->maxNumProcs . ') reached.');
 		}
 
 		$proc = array_pop($this->unassignedProcs);
@@ -170,7 +170,7 @@ class ProcessPool
 			}
 		}
 		if ($procIdx === null)
-			throw new ProcessPoolInvalidProcessException();
+			throw new ProcessPoolInvalidProcessException('Process not found.');
 		$process->freeRequest();
 		array_splice($this->runningProcs, $procIdx, 1);
 

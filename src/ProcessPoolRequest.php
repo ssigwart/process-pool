@@ -88,7 +88,7 @@ class ProcessPoolRequest
 	public function sendRequest(string $data): void
 	{
 		if ($this->process === null)
-			throw new ProcessPoolResourceFailedException();
+			throw new ProcessPoolResourceFailedException('Cannot send request. No process.');
 
 		// Write data
 		$this->writeMsg(ProcessPoolMessageTypes::MSG_START_REQUEST . ';' . strlen($data) . PHP_EOL . $data);
@@ -102,7 +102,7 @@ class ProcessPoolRequest
 	public function sendExitRequest(): void
 	{
 		if ($this->process === null)
-			throw new ProcessPoolResourceFailedException();
+			throw new ProcessPoolResourceFailedException('Cannot send exit request. No process.');
 
 		// Write data
 		$this->writeMsg(ProcessPoolMessageTypes::MSG_EXIT . ';' . PHP_EOL);
@@ -190,7 +190,7 @@ class ProcessPoolRequest
 	private function _hasPipeData(int $pipeIdx, int $waitSec = 0, int $waitUsec = 0): bool
 	{
 		if ($this->process === null)
-			throw new ProcessPoolResourceFailedException();
+			throw new ProcessPoolResourceFailedException('Cannot check pipe data. No process.');
 
 		// Check pipes
 		$read = [$this->pipes[$pipeIdx]];
@@ -240,7 +240,7 @@ class ProcessPoolRequest
 				// If this is the end of the file and there was no content, return empty string
 				if ($this->stdoutBuffer === '' && feof($this->pipes[1]))
 					return '';
-				throw new ProcessPoolUnexpectedEOFException();
+				throw new ProcessPoolUnexpectedEOFException('Unexpected EOF.');
 			}
 			else if ($readLen === $newReadLen)
 				throw new ProcessPoolUnexpectedMessageException('Input buffer: ' . substr($this->stdoutBuffer, 0, 64));
@@ -259,7 +259,7 @@ class ProcessPoolRequest
 
 			// Make sure not at EOF
 			if ($newInput === '')
-				throw new ProcessPoolUnexpectedEOFException();
+				throw new ProcessPoolUnexpectedEOFException('Unexpected EOF.');
 		}
 		$rtn = substr($this->stdoutBuffer, 0, $length);
 		$this->stdoutBuffer = substr($this->stdoutBuffer, $length);
@@ -295,7 +295,7 @@ class ProcessPoolRequest
 	private function _getResponseFromPipe(int $pipeIdx, ?int $maxNumBytes = null): string
 	{
 		if ($this->process === null || $this->failed)
-			throw new ProcessPoolResourceFailedException();
+			throw new ProcessPoolResourceFailedException('Cannot get response from pipe. No process or failed.');
 
 		// Read some data
 		$input = fread($this->pipes[$pipeIdx], min($maxNumBytes ?? 1024, 1024));
@@ -303,7 +303,7 @@ class ProcessPoolRequest
 		{
 			// Don't let the process be reuse
 			$this->failed = true;
-			throw new ProcessPoolUnexpectedEOFException();
+			throw new ProcessPoolUnexpectedEOFException('Failed to read from pipe.');
 		}
 
 		return $input;

@@ -74,7 +74,7 @@ class ProcessPoolProcess
 			{
 				$input = fread(STDIN, min($numBytesMoreToRead, 1024));
 				if ($input === false)
-					throw new ProcessPoolUnexpectedEOFException();
+					throw new ProcessPoolUnexpectedEOFException('Unexpected EOF.');
 				$this->inputBuffer .= $input;
 				$numBytesMoreToRead = $length - strlen($this->inputBuffer);
 			}
@@ -124,7 +124,7 @@ class ProcessPoolProcess
 			// Get more input. Note that we expect a new line after message types, so we can expect fread to exit before 1024 characters.
 			$input = fread(STDIN, 1024);
 			if ($input === false || ($input === '' && feof(STDIN)))
-				throw new ProcessPoolUnexpectedEOFException();
+				throw new ProcessPoolUnexpectedEOFException('EOF detected. Input buffer: "' . substr($this->inputBuffer, 0, 64) . '"');
 			$this->inputBuffer .= $input;
 		}
 	}
