@@ -125,6 +125,11 @@ This releases a process started with `startProcess` and allows it to go back int
 | - | - | - |
 | `$process` | `ProcessPoolRequest` | Process to release. |
 
+#### `shutDown`
+This sends "exit" requests to all processes and closes them.
+This should only be called after handling all open processes and the pool should not be used after this.
+Often, you don't need to call this function as the pool registers a shutdown function.
+
 ### `ProcessPoolRequest`
 Represents a pool request that can process a single request.
 

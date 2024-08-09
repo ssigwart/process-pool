@@ -140,13 +140,14 @@ final class ProcessPoolTest extends TestCase
 	/**
 	 * Test pool release before read
 	 */
-	public function testProcessPoolNoRelease(): void
+	public function testProcessPoolNoReadBeforeRead(): void
 	{
 		$poolSize = 1;
 		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
 
 		$req1 = $pool->startProcess();
 		$req1->sendRequest('Error 1');
+		$req1->waitForStdoutOrStderr(1); // Note: Without this, releasing may not think there's data
 		$pool->releaseProcess($req1);
 		$req1 = $pool->startProcess();
 		$req1->sendRequest('Testing 1');
@@ -246,5 +247,30 @@ final class ProcessPoolTest extends TestCase
 		$req1->sendRequest($data);
 		self::assertEquals('100;abc', $req1->getStdoutResponse());
 		$pool->releaseProcess($req1);
+	}
+
+	/**
+	 * Test pool manual shutdown
+	 */
+	public function testProcessPoolShutDown(): void
+	{
+		$poolSize = 3;
+		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+		self::assertEquals($poolSize, $pool->getNumUnassignedProcesses(), 'Number of processes unassigned should be ' . $poolSize . '.');
+
+		$req1 = $pool->startProcess();
+		$req1->sendRequest('Testing 1');
+		self::assertEquals('3560b3b3658d3f95d320367b007ee2b6', $req1->getStdoutResponse(), 'MD5 incorrect.');
+		self::assertEquals('', $req1->getStderrResponse(), 'Stderr should be empty.');
+		self::assertEquals(1, $pool->getNumRunningProcesses(), 'Number of processes running should be 1.');
+		$pool->releaseProcess($req1);
+
+		self::assertEquals(0, $pool->getNumRunningProcesses(), 'Number of processes running should be 0.');
+		self::assertEquals($poolSize, $pool->getNumUnassignedProcesses(), 'Number of processes unassigned should be ' . $poolSize . '.');
+
+		$pool->shutDown();
+
+		self::assertEquals(0, $pool->getNumRunningProcesses(), 'Number of processes running should be 0.');
+		self::assertEquals(0, $pool->getNumUnassignedProcesses(), 'Number of processes unassigned should be 0.');
 	}
 }

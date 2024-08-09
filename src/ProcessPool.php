@@ -52,6 +52,11 @@ class ProcessPool
 		// Add processes
 		for ($i = 0; $i < $this->minNumProcs; $i++)
 			$this->addProcess();
+
+		// Close processes on shutdown
+		register_shutdown_function(function() {
+			$this->handlePoolShutdown();
+		});
 	}
 
 	/**
@@ -60,6 +65,14 @@ class ProcessPool
 	public function __destruct()
 	{
 		// Close processes
+		$this->handlePoolShutdown();
+	}
+
+	/**
+	 * Handle pool shutdown
+	 */
+	private function handlePoolShutdown(): void
+	{
 		foreach ($this->runningProcs as $proc)
 		{
 			try {
@@ -72,6 +85,8 @@ class ProcessPool
 			} catch (Throwable $e) {
 			}
 		}
+		$this->runningProcs = [];
+
 		foreach ($this->unassignedProcs as $proc)
 		{
 			try {
@@ -84,6 +99,15 @@ class ProcessPool
 			} catch (Throwable $e) {
 			}
 		}
+		$this->unassignedProcs = [];
+	}
+
+	/**
+	 * Shut down process pool
+	 */
+	public function shutDown(): void
+	{
+		$this->handlePoolShutdown();
 	}
 
 	/**
@@ -97,6 +121,7 @@ class ProcessPool
 	{
 		if ($maxNumUnassignedProcs < $this->minNumProcs)
 			throw new ProcessPoolException('Number of spare servers cannot be less than minimum number of processes (' . $this->minNumProcs . ').');
+		$this->maxNumUnassignedProcs = $maxNumUnassignedProcs;
 	}
 
 	/**
@@ -178,7 +203,7 @@ class ProcessPool
 		if ($process->hasFailed())
 			$this->addProcess();
 		// Add this process back to the pool if needed
-		else if ($this->getNumUnassignedProcesses() + 1 < $this->maxNumUnassignedProcs)
+		else if ($this->getNumUnassignedProcesses() + 1 <= $this->maxNumUnassignedProcs)
 		{
 			if ($process->hasStdoutData())
 				$process->getStdoutResponse();
