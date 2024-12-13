@@ -7,6 +7,9 @@ use ssigwart\ProcessPool\ProcessPoolProcessMessageHandlerInterface;
 /** PHP unit test process */
 class PhpUnitTestProcess implements ProcessPoolProcessMessageHandlerInterface
 {
+	/** @var int Number of requests */
+	private int $numRequests = 0;
+
 	/**
 	 * Handle exit request
 	 */
@@ -22,6 +25,8 @@ class PhpUnitTestProcess implements ProcessPoolProcessMessageHandlerInterface
 	 */
 	public function handleRequest(string $data)
 	{
+		$this->numRequests++;
+
 		// Check if we should exit
 		if ($data === 'exit')
 		{
@@ -55,6 +60,9 @@ class PhpUnitTestProcess implements ProcessPoolProcessMessageHandlerInterface
 		// Check if we should echo data to stderr
 		else if (preg_match('/^stderr echo/A', $data, $match))
 			fwrite(STDERR, $data);
+		// Check if we should output request count
+		else if ($data === 'req-count')
+			print $this->numRequests;
 		else
 		{
 			// Output MD5 of data

@@ -168,6 +168,9 @@ Returns STDOUT response from the process.
 #### `getStderrResponse`
 Returns STDERR response from the process.
 
+#### `markAsFailed`
+Mark the process as failed so it will not be reused.
+
 ### Other Methods
 
 There are additional public function that you should not call directly.

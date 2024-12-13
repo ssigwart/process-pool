@@ -138,6 +138,41 @@ final class ProcessPoolTest extends TestCase
 	}
 
 	/**
+	 * Test process pool marked as failed
+	 */
+	public function testProcessPoolMarkedAsFailed(): void
+	{
+		$poolSize = 1;
+		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+
+		$req = $pool->startProcess();
+		$req->sendRequest('req-count');
+		self::assertEquals('1', $req->getStdoutResponse(), 'MD5 incorrect.');
+		$pool->releaseProcess($req);
+
+		$req = $pool->startProcess();
+		$req->sendRequest('req-count');
+		self::assertEquals('2', $req->getStdoutResponse(), 'MD5 incorrect.');
+		$pool->releaseProcess($req);
+
+		$req = $pool->startProcess();
+		$req->sendRequest('req-count');
+		self::assertEquals('3', $req->getStdoutResponse(), 'MD5 incorrect.');
+		$req->markAsFailed();
+		$pool->releaseProcess($req);
+
+		$req = $pool->startProcess();
+		$req->sendRequest('req-count');
+		self::assertEquals('1', $req->getStdoutResponse(), 'MD5 incorrect.');
+		$pool->releaseProcess($req);
+
+		$req = $pool->startProcess();
+		$req->sendRequest('req-count');
+		self::assertEquals('2', $req->getStdoutResponse(), 'MD5 incorrect.');
+		$pool->releaseProcess($req);
+	}
+
+	/**
 	 * Test pool release before read
 	 */
 	public function testProcessPoolNoReadBeforeRead(): void

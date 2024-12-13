@@ -284,6 +284,14 @@ class ProcessPoolRequest
 	}
 
 	/**
+	 * Mark as failed
+	 */
+	public function markAsFailed(): void
+	{
+		$this->failed = true;
+	}
+
+	/**
 	 * Get response from pipe
 	 *
 	 * @param int $pipeIdx Pipe index
