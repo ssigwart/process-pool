@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use ssigwart\ProcessPool\ProcessPool;
 use ssigwart\ProcessPool\ProcessPoolException;
 use ssigwart\ProcessPool\ProcessPoolPoolExhaustedException;
+use ssigwart\ProcessPool\ProcessPoolProcessOutputBeforeStartingException;
 
 /**
  * Process pool test
@@ -161,6 +162,50 @@ final class ProcessPoolTest extends TestCase
 		$req->markAsFailed();
 		$pool->releaseProcess($req);
 
+		$req = $pool->startProcess();
+		$req->sendRequest('req-count');
+		self::assertEquals('1', $req->getStdoutResponse(), 'MD5 incorrect.');
+		$pool->releaseProcess($req);
+
+		$req = $pool->startProcess();
+		$req->sendRequest('req-count');
+		self::assertEquals('2', $req->getStdoutResponse(), 'MD5 incorrect.');
+		$pool->releaseProcess($req);
+	}
+
+	/**
+	 * Test process pool error before response
+	 */
+	public function testProcessPoolErrorBeforeResponse(): void
+	{
+		$poolSize = 1;
+		$pool = new ProcessPool($poolSize, $poolSize, 'php processes/phpUnitProcesses.php', realpath(__DIR__ . DIRECTORY_SEPARATOR . '..'));
+
+		$req = $pool->startProcess();
+		$req->sendRequest('req-count');
+		self::assertEquals('1', $req->getStdoutResponse(), 'MD5 incorrect.');
+		$pool->releaseProcess($req);
+
+		$req = $pool->startProcess();
+		$req->sendRequest('req-count');
+		self::assertEquals('2', $req->getStdoutResponse(), 'MD5 incorrect.');
+		$pool->releaseProcess($req);
+
+		$req = $pool->startProcess();
+		$req->sendRequest('error-late-stdout');
+		usleep(5000);
+		self::assertEquals('Error, then sleep.', $req->getStderrResponse(), 'MD5 incorrect.');
+		self::assertEquals(false, $req->hasStdoutData(), 'No STDOUT expected.');
+		$pool->releaseProcess($req);
+		usleep(250000);
+
+		try {
+			$req = $pool->startProcess();
+			self::fail('Expected ProcessPoolProcessOutputBeforeStartingException.');
+		} catch (ProcessPoolProcessOutputBeforeStartingException $e) {
+			self::assertEquals([], $e->getStderrLines());
+			self::assertEquals(['Done sleep'], $e->getStdoutLines());
+		}
 		$req = $pool->startProcess();
 		$req->sendRequest('req-count');
 		self::assertEquals('1', $req->getStdoutResponse(), 'MD5 incorrect.');

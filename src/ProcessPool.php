@@ -173,6 +173,20 @@ class ProcessPool
 		$proc = array_pop($this->unassignedProcs);
 		$this->runningProcs[] = $proc;
 
+		// Make sure output is cleared
+		if ($proc->hasStderrData() || $proc->hasStdoutData())
+		{
+			$stderrLines = [];
+			$stdoutLines = [];
+			while ($proc->hasStderrData())
+				$stderrLines[] = $proc->getStderrResponse();
+			while ($proc->hasStdoutData())
+				$stdoutLines[] = $proc->getStdoutResponse();
+			$proc->markAsFailed();
+			$this->releaseProcess($proc);
+			throw new ProcessPoolProcessOutputBeforeStartingException($stderrLines, $stdoutLines);
+		}
+
 		return $proc;
 	}
 

@@ -63,6 +63,13 @@ class PhpUnitTestProcess implements ProcessPoolProcessMessageHandlerInterface
 		// Check if we should output request count
 		else if ($data === 'req-count')
 			print $this->numRequests;
+		// Check if we should test error with late STDOUT
+		else if ($data === 'error-late-stdout')
+		{
+			fwrite(STDERR, 'Error, then sleep.');
+			usleep(20000);
+			print 'Done sleep';
+		}
 		else
 		{
 			// Output MD5 of data
